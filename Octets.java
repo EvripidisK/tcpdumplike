@@ -1,7 +1,8 @@
 public class Octets {
-	// Assemble 4 octets en un entier non signé (rangé dans un long)
+
+	// 4 octets -> entier non signé (dans un long)
 	static long lireInt32(byte[] t, int off, boolean bigEndian) {
-		long b0 = t[off]     & 0xFF;
+		long b0 = t[off] & 0xFF;
 		long b1 = t[off + 1] & 0xFF;
 		long b2 = t[off + 2] & 0xFF;
 		long b3 = t[off + 3] & 0xFF;
@@ -12,9 +13,9 @@ public class Octets {
 		}
 	}
 
-	// Assemble 2 octets en un entier non signé (0 à 65535)
+	// 2 octets -> entier de 0 à 65535
 	static int lireInt16(byte[] t, int off, boolean bigEndian) {
-		int b0 = t[off]     & 0xFF;
+		int b0 = t[off] & 0xFF;
 		int b1 = t[off + 1] & 0xFF;
 		if (bigEndian) {
 			return (b0 << 8) | b1;

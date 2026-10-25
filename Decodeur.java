@@ -1,20 +1,27 @@
 public class Decodeur {
 
 	static void decoder(byte[] data, int linkType) {
-		if (linkType != 1) return;
-		if (data.length < 14) return;
+		if (linkType != 1) {
+			return;
+		}
+		if (data.length < 14) {
+			return;
+		}
 
 		int off = 0;
 		Ethernet eth = new Ethernet(data, off);
 		System.out.println(eth.macDst + " <- " + eth.macSrc);
 		System.out.printf("EtherType = 0x%04X%n", eth.etherType);
-		off += eth.taille();
+		off = off + 14;
 
-		switch (eth.etherType) {
-			case 0x0800: decoderIpv4(data, off); break;
-			case 0x0806: decoderArp(data, off); break;
-			case 0x86DD: decoderIpv6(data, off); break;
-			default:     System.out.printf("EtherType inconnu : 0x%04X, on s'arrête%n", eth.etherType);
+		if (eth.etherType == 0x0800) {
+			decoderIpv4(data, off);
+		} else if (eth.etherType == 0x0806) {
+			decoderArp(data, off);
+		} else if (eth.etherType == 0x86DD) {
+			decoderIpv6(data, off);
+		} else {
+			System.out.printf("EtherType inconnu : 0x%04X, on s'arrête%n", eth.etherType);
 		}
 	}
 
@@ -26,8 +33,7 @@ public class Decodeur {
 
 		Arp arp = new Arp(data, off);
 
-		System.out.println("ARP " + arp.opCodeTexte()
-				+ "  (" + arp.typeProtocoleTexte() + ")"
+		System.out.println("ARP " + arp.opCodeTexte() + "  (" + arp.typeProtocoleTexte() + ")"
 				+ "  sender=" + arp.macSender + " / " + arp.ipSender
 				+ "  target=" + arp.macTarget + " / " + arp.ipTarget);
 	}
@@ -47,16 +53,19 @@ public class Decodeur {
 			System.out.println("IPv4 invalide (version=" + ip.version + ", ihl=" + ip.ihl + ")");
 			return;
 		}
-		if (data.length < off + ip.taille()) {
+
+		int tailleEntete = ip.ihl * 4;
+
+		if (data.length < off + tailleEntete) {
 			System.out.println("IPv4 tronqué : options incomplètes");
 			return;
 		}
-		if (ip.totalLength < ip.taille()) {
+		if (ip.totalLength < tailleEntete) {
 			System.out.println("IPv4 invalide : Total Length (" + ip.totalLength + ") < en-tête");
 			return;
 		}
 
-		int finIp = ip.fin(offIp);
+		int finIp = offIp + ip.totalLength;
 		String note = "";
 		if (finIp > data.length) {
 			finIp = data.length;
@@ -64,15 +73,18 @@ public class Decodeur {
 		}
 
 		System.out.println("IPv4 " + ip.srcIp + " -> " + ip.dstIp
-				+ "  protocole=" + ip.protocol + "  en-tête=" + ip.taille()
+				+ "  protocole=" + ip.protocol + "  en-tête=" + tailleEntete
 				+ " octets  total=" + ip.totalLength + note);
-		off += ip.taille();
+		off = off + tailleEntete;
 
-		switch (ip.protocol) {
-			case 6:  decoderTcp(data, off, finIp, ip.srcIp, ip.dstIp); break;
-			case 17: decoderUdp(data, off, finIp); break;
-			case 1:  System.out.println("ICMP à partir de l'offset " + off + " (non géré)"); break;
-			default: System.out.println("Protocole IP " + ip.protocol + " non géré");
+		if (ip.protocol == 6) {
+			decoderTcp(data, off, finIp, ip.srcIp, ip.dstIp);
+		} else if (ip.protocol == 17) {
+			decoderUdp(data, off, finIp);
+		} else if (ip.protocol == 1) {
+			System.out.println("ICMP à partir de l'offset " + off + " (non géré)");
+		} else {
+			System.out.println("Protocole IP " + ip.protocol + " non géré");
 		}
 	}
 
@@ -90,7 +102,7 @@ public class Decodeur {
 			return;
 		}
 
-		int finIp = ip6.fin(off);
+		int finIp = off + 40 + ip6.payloadLength;
 		String note = "";
 		if (finIp > data.length) {
 			finIp = data.length;
@@ -100,13 +112,16 @@ public class Decodeur {
 		System.out.println("IPv6 " + ip6.srcIp + " -> " + ip6.dstIp
 				+ "  nextHeader=" + ip6.nextHeader + "  hopLimit=" + ip6.hopLimit
 				+ "  payload=" + ip6.payloadLength + note);
-		off += ip6.taille();
+		off = off + 40;
 
-		switch (ip6.nextHeader) {
-			case 6:  decoderTcp(data, off, finIp, ip6.srcIp, ip6.dstIp); break;
-			case 17: decoderUdp(data, off, finIp); break;
-			case 58: System.out.println("ICMPv6 à partir de l'offset " + off + " (non géré)"); break;
-			default: System.out.println("Next Header " + ip6.nextHeader + " non géré");
+		if (ip6.nextHeader == 6) {
+			decoderTcp(data, off, finIp, ip6.srcIp, ip6.dstIp);
+		} else if (ip6.nextHeader == 17) {
+			decoderUdp(data, off, finIp);
+		} else if (ip6.nextHeader == 58) {
+			System.out.println("ICMPv6 à partir de l'offset " + off + " (non géré)");
+		} else {
+			System.out.println("Next Header " + ip6.nextHeader + " non géré");
 		}
 	}
 
@@ -126,8 +141,8 @@ public class Decodeur {
 
 		System.out.println("UDP " + udp.udpSrc + " -> " + udp.udpDst
 				+ "  length=" + udp.udpLength);
-		off += udp.taille();
-		int donnees = udp.udpLength - udp.taille();
+		off = off + 8;
+		int donnees = udp.udpLength - 8;
 		System.out.println("Données UDP : " + donnees
 				+ " octets, à partir de l'offset " + off);
 
@@ -149,7 +164,13 @@ public class Decodeur {
 
 		Dns dns = new Dns(data, off);
 
-		System.out.println("DNS " + (dns.reponse ? "réponse" : "requête")
+		String sens;
+		if (dns.reponse) {
+			sens = "réponse";
+		} else {
+			sens = "requête";
+		}
+		System.out.println("DNS " + sens
 				+ "  id=" + dns.id
 				+ "  questions=" + dns.qdcount + "  réponses=" + dns.ancount);
 
@@ -174,15 +195,25 @@ public class Decodeur {
 
 		Dhcp dhcp = new Dhcp(data, off, donnees);
 
-		System.out.println("DHCP " + (dhcp.op == 1 ? "BOOTREQUEST" : "BOOTREPLY")
-				+ (dhcp.typeMessage >= 0 ? "  " + Dhcp.typeTexte(dhcp.typeMessage) : "")
+		String type;
+		if (dhcp.op == 1) {
+			type = "BOOTREQUEST";
+		} else {
+			type = "BOOTREPLY";
+		}
+		String typeMessage = "";
+		if (dhcp.typeMessage >= 0) {
+			typeMessage = "  " + Dhcp.typeTexte(dhcp.typeMessage);
+		}
+
+		System.out.println("DHCP " + type + typeMessage
 				+ "  xid=0x" + Long.toHexString(dhcp.xid));
 		System.out.println("  client=" + dhcp.macClient
 				+ "  ciaddr=" + dhcp.ciaddr + "  yiaddr=" + dhcp.yiaddr);
 	}
 
 	// Décode l'en-tête TCP qui commence à l'offset off. finIp = fin du paquet IP.
-	// srcIp/dstIp viennent de la couche IP (IPv4 ou IPv6) qui a appelé cette méthode.
+	// srcIp et dstIp viennent de la couche IP (IPv4 ou IPv6) qui a appelé cette méthode.
 	static void decoderTcp(byte[] data, int off, int finIp, String srcIp, String dstIp) {
 		if (finIp - off < 20) {
 			System.out.println("TCP tronqué : en-tête incomplet");
@@ -195,18 +226,21 @@ public class Decodeur {
 			System.out.println("TCP invalide : dataOffset=" + tcp.dataOffset);
 			return;
 		}
-		if (finIp - off < tcp.taille()) {
+
+		int tailleEntete = tcp.dataOffset * 4;
+
+		if (finIp - off < tailleEntete) {
 			System.out.println("TCP tronqué : options incomplètes");
 			return;
 		}
 
-		int donnees = tcp.longueurDonnees(off, finIp);
+		int donnees = finIp - (off + tailleEntete);
 
 		System.out.println("TCP " + tcp.tcpSrc + " -> " + tcp.tcpDst
 				+ "  [" + tcp.flagsTexte() + "]"
 				+ "  seq=" + tcp.seq + "  ack=" + tcp.ack
-				+ "  win=" + tcp.window + "  en-tête=" + tcp.taille() + " octets");
-		off += tcp.taille();
+				+ "  win=" + tcp.window + "  en-tête=" + tailleEntete + " octets");
+		off = off + tailleEntete;
 		System.out.println("Données TCP : " + donnees + " octets, à partir de l'offset " + off);
 
 		if (donnees > 0) {
@@ -214,8 +248,10 @@ public class Decodeur {
 			TcpStream.ajouter(srcIp, tcp.tcpSrc, dstIp, tcp.tcpDst, morceau);
 		}
 
-		if (donnees > 0 && (tcp.tcpSrc == 80 || tcp.tcpDst == 80) && Http.estHttp(data, off, donnees)) {
-			decoderHttp(data, off, donnees);
+		if (donnees > 0 && (tcp.tcpSrc == 80 || tcp.tcpDst == 80)) {
+			if (Http.estHttp(data, off, donnees)) {
+				decoderHttp(data, off, donnees);
+			}
 		}
 	}
 
@@ -223,8 +259,13 @@ public class Decodeur {
 	static void decoderHttp(byte[] data, int off, int longueur) {
 		Http http = new Http(data, off, longueur);
 
-		System.out.println("HTTP " + (http.requete ? "requête" : "réponse")
-				+ "  : " + http.ligneDepart);
+		String type;
+		if (http.requete) {
+			type = "requête";
+		} else {
+			type = "réponse";
+		}
+		System.out.println("HTTP " + type + "  : " + http.ligneDepart);
 		System.out.println("Corps HTTP : " + http.corps.length() + " octets");
 	}
 }
