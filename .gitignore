@@ -1,0 +1,23 @@
+# Fichiers Java compilés
+*.class
+
+# Fichiers de configuration d'IDE
+.idea/
+.vscode/
+.project
+.classpath
+.settings/
+
+# Dossiers de compilation
+target/
+build/
+out/
+
+# Fichiers temporaires
+*.log
+*.tmp
+
+# Fichiers locaux contenant des secrets
+.env
+.env.*
+!.env.example
